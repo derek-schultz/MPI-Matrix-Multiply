@@ -1,0 +1,46 @@
+Hello Justin,
+
+Unfortunately, I ran into some problems when trying to run my code on the BG/Q.
+My last attempt took a very long time in the queue (I wasn't sure if it was
+going to finish in time) and when I got home today (Monday) I found that it had
+failed due to a syntax error in my batch script. I immediately resubmitted, but
+at the rate jobs are going through, it doesn't appear as though it will finish
+in the next few hours.
+
+Everything is present here, except for the analysis and results from the BG/Q.
+I am simply waiting at this point, as the Q appears to be very busy. I hope
+that you will accept my results via email as soon as I receive data from the Q,
+but I will understand if you cannot.
+
+Thank you,
+Derek Schultz
+
+Available targets:
+==================
+
+make kratos: Compiles and runs a 8192 square matrix on 8 cores
+
+make quick: Compiles and runs a 1024 square matrix on 8 cores
+
+make verify: Same as make quick, but prints out mpi rank 1's part of the matrix
+
+make bgq: For the Blue Gene Q. Builds, but does not run. Changes CLOCK_RATE.
+
+make clean: Deletes everything in ./bin
+
+
+Executing the program yourself:
+===============================
+
+If you need to, here is the usage:
+
+bin/matrix_multiply <matrix_size> [--print_matrix]
+
+--print_matrix is an optional flag that indicates the mpi rank 1's portion of
+the matrix should printed
+
+
+Running on the BG/Q:
+====================
+
+Batch script is in ./bgq
