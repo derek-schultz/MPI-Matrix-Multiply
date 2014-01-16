@@ -10,35 +10,41 @@
 
 #define CLOCK_RATE 2666700000.0; // change to 700000000.0 for Blue Gene/L
 
+/* Structure for passing arguments to the thread function */
 typedef struct args_struct {
   double** A;
   double** B;
   double** C;
-  int size;
-  int frac;
-  int offset;
+  int size;         // Total size of matrix
+  int frac;         // Total fraction the node is responsible for
+  int thread_frac;  // Fraction this thread is responsible for
+  int col_offset;
+  int row_offset;
 } thread_args;
 
+/* Each individual thread runs this matrix multiply function */
 void* matrix_multiply_thread (void* arg)
 {
   int i = 0, j = 0, k = 0;
   thread_args* t_arg = (thread_args*)arg;
   
-  for (i = 0; i < t_arg->frac; i++)
+  /* i begins at row offset (depending on which thread this is) */
+  for (i = t_arg->row_offset; i < t_arg->row_offset + t_arg->thread_frac; i++)
   {
     for (j = 0; j < t_arg->frac; j++)
     {
       for (k = 0; k < t_arg->size; k++)
       {
-        t_arg->C[i][t_arg->offset + j] += t_arg->A[i][k] * t_arg->B[k][j];
+        /* j is offset depending on which B matrix is being worked on */
+        t_arg->C[i][j + t_arg->col_offset] += t_arg->A[i][k] * t_arg->B[k][j];
       }
     }
   }
 }
 
-/* Multiply A and B matrix fractions */
+/* Delegates matrix multiplication pieces to threads */
 void matrix_multiply_part (double** A, double** B, double** C, int size,
-                           int frac, int offset, int num_threads,
+                           int frac, int col_offset, int num_threads,
                            unsigned long long* timer, int task_id)
 {
   unsigned long long begin = rdtsc();
@@ -48,9 +54,13 @@ void matrix_multiply_part (double** A, double** B, double** C, int size,
   pthread_t* threads = malloc(sizeof(pthread_t) * num_threads);
   thread_args** args = malloc(sizeof(thread_args*) * num_threads);
 
-  frac = frac / num_threads;
-  offset *= frac;
+  int row_offset = 0;
+  col_offset *= frac;
 
+  int thread_offset = 0;
+  int thread_frac = frac / num_threads;
+
+  /* For each thread: create an arg struct, spawn thread, increase offset */
   for (i = 0; i < num_threads; i++)
   {
     args[i] = malloc(sizeof(thread_args));
@@ -59,14 +69,17 @@ void matrix_multiply_part (double** A, double** B, double** C, int size,
     args[i]->C = C;
     args[i]->size = size;
     args[i]->frac = frac;
-    args[i]->offset = offset;
+    args[i]->thread_frac = thread_frac;
+    args[i]->col_offset = col_offset;
+    args[i]->row_offset = row_offset;
     pthread_create(&threads[i], NULL, matrix_multiply_thread, args[i]);
+    row_offset += thread_frac;
   }
 
-  /* wait for threads to terminate */
+  /* Wait for threads to terminate */
   for (i = 0; i < num_threads; i++)
   {
-    pthread_join(threads[i], NULL);  /* BLOCK */
+    pthread_join(threads[i], NULL);
     free(args[i]);
   }
 
@@ -151,6 +164,7 @@ int main (int argc, char* argv[])
 
   int matrix_fraction = matrix_size / num_tasks;
 
+  /* Initialize the three matrices */
   A_data = alloc_matrix_contig(matrix_fraction, matrix_size);
   B_data = alloc_matrix_contig(matrix_size, matrix_fraction);
   C_data = alloc_matrix_contig(matrix_fraction, matrix_size);
@@ -162,7 +176,7 @@ int main (int argc, char* argv[])
   B_buffer = alloc_matrix_contig(matrix_size, matrix_fraction);
   B_buffer_addr = create_matrix_2d(B_buffer, matrix_size, matrix_fraction);
 
-  for (i = 0; i < matrix_fraction; i++)  /* Initialization */
+  for (i = 0; i < matrix_fraction; i++)
   {
     for (j = 0; j < matrix_size; j++)
     {
@@ -171,6 +185,7 @@ int main (int argc, char* argv[])
     }
   }
 
+  /* For each MPI task, pass around the B matrix */
   for (i = 0; i < num_tasks; i++)
   {
     pre_send_recv = rdtsc();

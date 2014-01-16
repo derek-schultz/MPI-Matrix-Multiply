@@ -11,7 +11,7 @@ quick:
 
 verify:
 	mpicc src/matrix_multiply.c -o bin/matrix_multiply
-	mpirun -n 8 bin/matrix_multiply 1024 2 --print_matrix
+	mpirun -n 2 bin/matrix_multiply 16 2 --print_matrix
 
 bgq:
 	mpicc src/matrix_multiply.c -o bin/matrix_multiply -DCLOCK_RATE=1666700000.0
